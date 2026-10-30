@@ -1,0 +1,212 @@
+@if (!isAuthenticated()) {
+  <main class="auth-shell">
+    <section class="auth-aside" aria-label="Employee portal">
+      <a class="brand" href="#" aria-label="Simplify3x home">
+        <span class="brand-mark">S</span>
+        <span>Simplify3x<span class="brand-light">/people</span></span>
+      </a>
+      <div class="auth-message">
+        <p class="eyebrow">PEOPLE OPERATIONS</p>
+        <h1>Good work<br>starts with<br><em>good people.</em></h1>
+        <p class="auth-copy">Your workday, thoughtfully organized. Sign in to manage your time, team, and everything in between.</p>
+      </div>
+      <div class="auth-aside-bottom">
+        <p>One place for your whole workday.</p>
+      </div>
+      <span class="aside-orbit orbit-one"></span>
+      <span class="aside-orbit orbit-two"></span>
+    </section>
+
+    <section class="auth-main">
+      <div class="auth-mobile-brand brand"><span class="brand-mark">S</span><span>Simplify3x<span class="brand-light">/people</span></span></div>
+      <div class="auth-form-wrap">
+        <p class="eyebrow">SIMPLIFY3X · TEAM PORTAL</p>
+        @if (authMode() === 'login') {
+          <h2>Welcome back</h2>
+          <p class="form-intro">Sign in with your employee credentials.</p>
+          <form [formGroup]="loginForm" (ngSubmit)="login()" class="auth-form">
+            <label for="login-employee-id">Employee ID</label>
+            <input id="login-employee-id" formControlName="employeeId" placeholder="Enter your employee ID" autocomplete="username">
+            @if (loginForm.controls.employeeId.touched && loginForm.controls.employeeId.invalid) { <span class="field-error">Enter your employee ID.</span> }
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" formControlName="password" placeholder="Enter your password" autocomplete="current-password">
+            @if (loginForm.controls.password.touched && loginForm.controls.password.invalid) { <span class="field-error">Enter your password.</span> }
+            <button class="button button-primary auth-submit" type="submit">Sign in <span aria-hidden="true">↗</span></button>
+          </form>
+          <p class="auth-switch">New to Simplify3x? <button type="button" (click)="setAuthMode('register')">Create an account</button></p>
+        } @else {
+          <h2>Create your account</h2>
+          <p class="form-intro">Register your employee profile to get started.</p>
+          <form [formGroup]="registerForm" (ngSubmit)="register()" class="auth-form register-form">
+            <div class="form-two-col">
+              <div><label for="register-first">First name</label><input id="register-first" formControlName="firstName" placeholder="First name" autocomplete="given-name"></div>
+              <div><label for="register-last">Last name</label><input id="register-last" formControlName="lastName" placeholder="Last name" autocomplete="family-name"></div>
+            </div>
+            <label for="register-employee-id">Employee ID</label>
+            <input id="register-employee-id" formControlName="employeeId" placeholder="e.g. EMP-1042">
+            <label for="register-designation">Designation</label>
+            <input id="register-designation" formControlName="designation" placeholder="e.g. Product Designer">
+            <label for="register-email">Email address</label>
+            <input id="register-email" type="email" formControlName="email" placeholder="you@company.com" autocomplete="email">
+            @if (registerForm.controls.email.touched && registerForm.controls.email.invalid) { <span class="field-error">Enter a valid email address.</span> }
+            <label for="register-password">Password</label>
+            <input id="register-password" type="password" formControlName="password" placeholder="At least 6 characters" autocomplete="new-password">
+            @if (registerForm.controls.password.touched && registerForm.controls.password.invalid) { <span class="field-error">Start with a capital letter, use at least 6 characters, and include a digit.</span> }
+            <label for="register-confirm">Confirm password</label>
+            <input id="register-confirm" type="password" formControlName="confirmPassword" placeholder="Enter password again" autocomplete="new-password">
+            @if (registerForm.touched && registerForm.hasError('passwordMismatch')) { <span class="field-error">Passwords do not match.</span> }
+            <button class="button button-primary auth-submit" type="submit">Create account <span aria-hidden="true">↗</span></button>
+          </form>
+          <p class="auth-switch">Already registered? <button type="button" (click)="setAuthMode('login')">Sign in</button></p>
+        }
+        @if (notice()) { <p class="auth-notice" role="status">{{ notice() }}</p> }
+      </div>
+      <p class="auth-legal">© 2026 Simplify3x <span>Privacy</span><span>Support</span></p>
+    </section>
+  </main>
+} @else {
+  <div class="workspace">
+    @if (mobileMenuOpen()) { <button class="mobile-scrim" type="button" aria-label="Close navigation" (click)="mobileMenuOpen.set(false)"></button> }
+    <aside class="sidebar" [class.sidebar-open]="mobileMenuOpen()">
+      <a class="brand sidebar-brand" href="#" aria-label="Simplify3x home"><span class="brand-mark">S</span><span>Simplify3x<span class="brand-light">/people</span></span></a>
+      <div class="workspace-label">WORKSPACE <span>⌄</span></div>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <p class="nav-caption">YOUR SPACE</p>
+        @for (item of navigation; track item.key) {
+          <button type="button" class="nav-item" [class.nav-active]="activeSection() === item.key" [attr.aria-current]="activeSection() === item.key ? 'page' : null" (click)="selectSection(item.key)">
+            <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span><span>{{ item.label }}</span>
+            @if (item.key === 'leave' && pendingLeaveCount() > 0) { <span class="nav-count">{{ pendingLeaveCount() }}</span> }
+          </button>
+        }
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="help-note"><span class="help-icon">?</span><div><strong>Need a hand?</strong><small>We're here for you</small></div><span class="help-arrow">↗</span></div>
+        <button type="button" class="sidebar-profile" (click)="selectSection('profile')">
+          <span class="person-avatar avatar-sage">{{ initials(currentEmployee()) }}</span>
+          <span class="sidebar-person"><strong>{{ fullName() }}</strong><small>{{ currentEmployee().designation }}</small></span>
+          <span class="profile-menu" aria-hidden="true">···</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <button class="mobile-menu-button" type="button" aria-label="Open navigation" (click)="mobileMenuOpen.set(true)">☰</button>
+        <div class="breadcrumbs"><span>People</span><span class="crumb-slash">/</span><strong>{{ navigation.find(item => item.key === activeSection())?.label }}</strong></div>
+        <div class="topbar-actions"><span class="today-label">{{ todayLabel }}</span><button class="icon-button notification-button" type="button" aria-label="Notifications">♧<i></i></button><button class="topbar-avatar" type="button" aria-label="Open profile" (click)="selectSection('profile')">{{ initials(currentEmployee()) }}</button></div>
+      </header>
+
+      @if (notice()) { <div class="notice-banner" role="status"><span class="notice-dot"></span>{{ notice() }}<button type="button" aria-label="Dismiss message" (click)="notice.set('')">×</button></div> }
+
+      <div class="page-content">
+        @switch (activeSection()) {
+          @case ('overview') {
+            <section class="page-heading"><div><p class="eyebrow">{{ todayLabel }}</p><h1>Your day at a glance<span class="heading-period">.</span></h1><p class="page-subtitle">Here’s what’s happening across your team today.</p></div><button class="button button-outline" type="button" (click)="selectSection('attendance')"><span aria-hidden="true">◷</span> View attendance</button></section>
+            @if (apiAvailable() === false) { <div class="api-banner"><span class="api-indicator"></span><div><strong>Database unavailable</strong><span>Could not connect to the backend. Changes are not saved until the database connection is restored.</span></div><code>localhost:8080/api</code></div> }
+            <section class="metric-grid" aria-label="Team summary">
+              <article class="metric-card"><div class="metric-top"><span>Total employees</span><span class="metric-icon icon-coral">♙</span></div><strong class="metric-value">{{ employees().length }}</strong><div class="metric-foot"><span>Employee records in database</span></div><div class="metric-accent accent-coral"></div></article>
+              <article class="metric-card"><div class="metric-top"><span>My attendance</span><span class="metric-icon icon-green">✓</span></div><strong class="metric-value">{{ currentAttendance()?.status ?? '—' }}</strong><div class="metric-foot"><span class="status-pip pip-green"></span><span>Saved for today</span></div><div class="metric-accent accent-green"></div></article>
+              <article class="metric-card"><div class="metric-top"><span>My leave requests</span><span class="metric-icon icon-yellow">◷</span></div><strong class="metric-value">{{ leaveRequests().filter(request => request.employeeId === currentEmployee().employeeId).length }}</strong><div class="metric-foot"><span class="status-pip pip-yellow"></span><span>From your database profile</span></div><div class="metric-accent accent-yellow"></div></article>
+              <article class="metric-card"><div class="metric-top"><span>Pending requests</span><span class="metric-icon icon-blue">▤</span></div><strong class="metric-value">{{ pendingLeaveCount() }}</strong><div class="metric-foot"><button type="button" class="text-action" (click)="selectSection('leave')">Review requests <span aria-hidden="true">→</span></button></div><div class="metric-accent accent-blue"></div></article>
+            </section>
+
+            <section class="overview-grid dashboard-attendance-grid">
+              <article class="panel attendance-panel">
+                <div class="panel-heading"><div><p class="eyebrow">YOUR ATTENDANCE</p><h2>Make today count</h2></div><span class="live-label"><i></i> TODAY</span></div>
+                <div class="clock-row"><div class="clock-block"><span class="clock-label">CHECK IN</span><strong>{{ currentAttendance()?.checkIn ?? '— — : — —' }}</strong><small>{{ currentAttendance()?.checkIn ? 'You’re checked in' : 'Not checked in yet' }}</small></div><span class="clock-divider"></span><div class="clock-block"><span class="clock-label">CHECK OUT</span><strong>{{ currentAttendance()?.checkOut ?? '— — : — —' }}</strong><small>{{ currentAttendance()?.checkOut ? 'Have a good evening' : 'End of your workday' }}</small></div></div>
+                <div class="attendance-actions"><button class="button button-primary" type="button" [disabled]="hasCheckedIn()" (click)="checkIn()">Check in <span aria-hidden="true">↗</span></button><button class="button button-outline" type="button" [disabled]="!hasCheckedIn() || hasCheckedOut()" (click)="checkOut()">Check out</button><span class="workday-note"><span class="status-pip pip-green"></span> 9+ hours: present · up to 8.5 hours: half-day</span></div>
+              </article>
+              <article class="panel attendance-calendar-panel">
+                <div class="panel-heading"><div><p class="eyebrow">ATTENDANCE CHART</p><h2>{{ calendarTitle() }}</h2></div><div class="calendar-controls"><button class="calendar-nav" type="button" aria-label="Previous month" (click)="shiftCalendarMonth(-1)">‹</button><button class="calendar-nav" type="button" aria-label="Next month" (click)="shiftCalendarMonth(1)">›</button></div></div>
+                <div class="attendance-calendar" role="grid" [attr.aria-label]="'Attendance for ' + calendarTitle()">
+                  @for (weekday of ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']; track weekday) { <span class="calendar-weekday" role="columnheader">{{ weekday }}</span> }
+                  @for (cell of calendarCells(); track $index) {
+                    @if (cell) { <span class="calendar-day" role="gridcell" [class.calendar-day-present]="cell.status === 'present'" [class.calendar-day-exception]="cell.status === 'exception'" [class.calendar-day-half-leave]="cell.status === 'half-day-leave'" [class.calendar-day-full-leave]="cell.status === 'full-day-leave'" [class.calendar-day-holiday]="cell.status === 'holiday'" [class.calendar-day-week-off]="cell.status === 'week-off'" [class.calendar-day-today]="cell.today" [title]="cell.isoDate + ' · ' + cell.label" [attr.aria-label]="cell.isoDate + ', ' + cell.label">{{ cell.day }}</span> }
+                    @else { <span class="calendar-day-empty" aria-hidden="true"></span> }
+                  }
+                </div>
+                <div class="attendance-calendar-legend"><span><i class="calendar-day-present"></i>Present</span><span><i class="calendar-day-exception"></i>Exception</span><span><i class="calendar-day-half-leave"></i>Half day leave</span><span><i class="calendar-day-full-leave"></i>Full day leave</span><span><i class="calendar-day-holiday"></i>Holiday</span><span><i class="calendar-day-week-off"></i>Week off</span><span><i class="calendar-day-no-record"></i>No record</span></div>
+              </article>
+            </section>
+          }
+          @case ('attendance') {
+            <section class="page-heading"><div><p class="eyebrow">TIME & PRESENCE</p><h1>Attendance<span class="heading-period">.</span></h1><p class="page-subtitle">Daily check-ins and check-outs for your team.</p></div><div class="heading-tools"><span class="date-chip">◷ &nbsp;{{ todayLabel }}</span><button class="button button-primary" type="button" [disabled]="hasCheckedIn()" (click)="checkIn()">Check in</button><button class="button button-outline" type="button" [disabled]="!hasCheckedIn() || hasCheckedOut()" (click)="checkOut()">Check out</button></div></section>
+            <section class="metric-grid compact-metrics"><article class="metric-card"><div class="metric-top"><span>Present</span><span class="metric-icon icon-green">✓</span></div><strong class="metric-value">{{ attendance().filter(entry => entry.status === 'Present').length }}</strong><div class="metric-foot"><span>Checked in today</span></div></article><article class="metric-card"><div class="metric-top"><span>Late arrivals</span><span class="metric-icon icon-yellow">◷</span></div><strong class="metric-value">{{ attendance().filter(entry => entry.status === 'Late').length }}</strong><div class="metric-foot"><span>After 09:00 AM</span></div></article><article class="metric-card"><div class="metric-top"><span>Half-day leave</span><span class="metric-icon icon-blue">◷</span></div><strong class="metric-value">{{ attendance().filter(entry => entry.status === 'Half day leave').length }}</strong><div class="metric-foot"><span>Check-outs up to 8.5 hours</span></div></article></section>
+            <section class="panel full-table-panel"><div class="panel-heading"><div><p class="eyebrow">{{ todayLabel }}</p><h2>My attendance</h2></div><span class="table-count">Check-ins from database</span></div><div class="table-scroll"><table><thead><tr><th>EMPLOYEE</th><th>EMPLOYEE ID</th><th>DESIGNATION</th><th>CHECK IN</th><th>CHECK OUT</th><th>STATUS</th></tr></thead><tbody>@for (entry of attendance(); track entry.employeeId) {<tr><td><strong>{{ entry.name }}</strong></td><td>{{ entry.employeeId }}</td><td>{{ entry.designation }}</td><td>{{ entry.checkIn }}</td><td>{{ entry.checkOut }}</td><td><span class="status-tag" [class.status-present]="entry.status === 'Present'" [class.status-late]="entry.status === 'Late'" [class.status-leave]="entry.status === 'On leave' || entry.status === 'Half day leave'"><i></i>{{ entry.status }}</span></td></tr>}</tbody></table></div></section>
+          }
+          @case ('leave') {
+            <section class="page-heading"><div><p class="eyebrow">TIME AWAY</p><h1>Leave requests<span class="heading-period">.</span></h1><p class="page-subtitle">Plan time off and keep every request in view.</p></div><button class="button button-primary" type="button" (click)="leaveDialogOpen.set(true)">＋ New request</button></section>
+            <section class="leave-summary"><div><span class="leave-count-icon">◷</span><span><small>YOUR RECORDED LEAVE REQUESTS</small><strong>{{ leaveRequests().filter(request => request.employeeId === currentEmployee().employeeId).length }} <em>requests</em></strong></span></div><span class="leave-summary-note">Saved in the database</span></section>
+            <section class="panel full-table-panel"><div class="panel-heading"><div><p class="eyebrow">REQUESTS & APPROVALS</p><h2>All requests</h2></div><span class="table-count">{{ leaveRequests().length }} requests</span></div><div class="table-scroll"><table><thead><tr><th>EMPLOYEE</th><th>TYPE</th><th>DATES</th><th>WORK DAYS</th><th>STATUS</th>@if (isHr()) { <th class="action-heading">ACTION</th> }</tr></thead><tbody>@for (request of leaveRequests(); track request.id) {<tr><td><div class="request-person"><strong>{{ request.employeeName }}</strong><small>{{ request.employeeId }}</small></div></td><td>{{ request.type }}</td><td>{{ request.startDate }} – {{ request.endDate }}</td><td>{{ request.days }} {{ request.days === 1 ? 'day' : 'days' }}</td><td><span class="status-tag" [class.status-pending]="request.status === 'Pending'" [class.status-present]="request.status === 'Approved'" [class.status-declined]="request.status === 'Declined'"><i></i>{{ request.status === 'Declined' ? 'Rejected' : request.status }}</span></td>@if (isHr()) { <td>@if (request.status === 'Pending') { <div class="row-actions"><button type="button" class="approve-action" (click)="updateLeave(request, 'Approved')">Approve</button><button type="button" class="decline-action" (click)="updateLeave(request, 'Declined')">Reject</button></div> } @else { <span class="muted-dash">—</span> }</td> }</tr>}</tbody></table></div></section>
+          }
+          @case ('holidays') {
+            <section class="page-heading holiday-page-heading"><div><p class="eyebrow">COMPANY CALENDAR</p><h1>Holiday List {{ holidayYear() }}<span class="heading-period">.</span></h1><p class="page-subtitle">Company holidays are excluded from leave-day totals.</p></div><span class="holiday-count-chip">{{ holidayRows().length }} holidays</span></section>
+            <section class="holiday-toolbar"><div class="holiday-filters"><button type="button" [class.filter-active]="holidayFilter() === 'upcoming'" (click)="holidayFilter.set('upcoming')">Upcoming ({{ upcomingHolidayCount() }})</button><button type="button" [class.filter-active]="holidayFilter() === 'all'" (click)="holidayFilter.set('all')">All</button></div><div class="holiday-year-controls"><button type="button" class="calendar-nav" aria-label="Previous year" (click)="shiftHolidayYear(-1)">‹</button><span>{{ holidayYear() }}</span><button type="button" class="calendar-nav" aria-label="Next year" (click)="shiftHolidayYear(1)">›</button>@if (isHr()) { <button class="button button-primary" type="button" (click)="holidayEditorOpen.set(!holidayEditorOpen())">{{ holidayEditorOpen() ? 'Cancel' : 'Add company holiday' }}</button> }</div></section>
+            @if (holidayEditorOpen() && isHr()) { <form class="profile-wizard holiday-form" [formGroup]="holidayForm" (ngSubmit)="addPublicHoliday()"><div class="wizard-heading"><h2>Add company holiday</h2><p>Add a holiday to the company calendar.</p></div><div class="form-two-col"><div><label for="holiday-date">Date</label><input id="holiday-date" type="date" formControlName="date"></div><div><label for="holiday-name">Holiday name</label><input id="holiday-name" formControlName="name" maxlength="120"></div></div><label for="holiday-description">Details (optional)</label><input id="holiday-description" formControlName="description" maxlength="500"><div class="wizard-actions"><span></span><button class="button button-primary" type="submit" [disabled]="holidayForm.invalid">Save holiday</button></div></form> }
+            <section class="holiday-list" aria-label="Holiday list">
+              @for (holiday of holidayRows(); track holiday.id) { <article class="holiday-list-row"><div class="holiday-date-badge"><strong>{{ holidayDay(holiday.date) }}</strong><span>{{ holidayMonth(holiday.date) }}</span></div><div class="holiday-list-copy"><h2>{{ holiday.name }}</h2><p>{{ holidayWeekday(holiday.date) }}@if (holiday.description) { <span> · {{ holiday.description }}</span> }</p></div><span class="holiday-source-chip">Company</span>@if (isHr()) { <button type="button" class="delete-action" (click)="removePublicHoliday(holiday)">Remove</button> }</article> }
+              @if (!holidayRows().length) { <div class="holiday-empty">No company holidays are available for {{ holidayYear() }}.</div> }
+            </section>
+          }
+          @case ('employees') {
+            <section class="page-heading"><div><p class="eyebrow">PEOPLE DIRECTORY</p><h1>Your team<span class="heading-period">.</span></h1><p class="page-subtitle">{{ employees().length }} colleagues, doing great things together.</p></div><span class="directory-stamp"><span>TEAM</span><strong>{{ employees().length.toString().padStart(2, '0') }}</strong></span></section>
+            <section class="designation-strip"><div><span class="strip-label">DESIGNATIONS</span>@for (designation of designations(); track designation) { <span class="designation-chip">{{ designation }}</span> }</div><span class="strip-total">{{ employees().length }} active</span></section>
+            <section class="panel full-table-panel"><div class="panel-heading"><div><p class="eyebrow">EMPLOYEE DIRECTORY</p><h2>All employees</h2></div><span class="table-count">Sorted by name</span></div><div class="table-scroll"><table><thead><tr><th>EMPLOYEE</th><th>EMPLOYEE ID</th><th>DESIGNATION</th><th>EMAIL</th><th class="action-heading">ACTION</th></tr></thead><tbody>@for (employee of employees(); track employee.employeeId) {<tr><td><div class="employee-cell"><span class="person-avatar" [class]="'person-avatar avatar-' + ($index % 4)">{{ initials(employee) }}</span><span><strong>{{ employee.firstName }} {{ employee.lastName }}</strong><small>Active employee</small></span></div></td><td>{{ employee.employeeId }}</td><td><span class="designation-text">{{ employee.designation }}</span></td><td>{{ employee.email }}</td><td><button class="delete-action" type="button" [disabled]="employee.employeeId === currentEmployee().employeeId" [attr.aria-label]="'Remove ' + employee.firstName + ' ' + employee.lastName" (click)="removeEmployee(employee)">Remove</button></td></tr>}</tbody></table></div></section>
+          }
+          @case ('profile') {
+            @if (profileStep() === 'view') {
+              <section class="page-heading"><div><p class="eyebrow">YOUR ACCOUNT</p><h1>My profile<span class="heading-period">.</span></h1><p class="page-subtitle">Your employee information and personal details.</p></div><div class="heading-tools"><button class="button button-primary" type="button" (click)="openProfileEditor()">Edit profile</button><button class="button button-outline" type="button" (click)="signOut()">Sign out <span aria-hidden="true">↗</span></button></div></section>
+              <section class="profile-layout"><article class="profile-card"><div class="profile-cover"><span class="cover-orbit cover-orbit-a"></span><span class="cover-orbit cover-orbit-b"></span></div><div class="profile-card-body">@if (employeeProfile()?.profileImageBase64) { <img class="profile-photo" alt="Profile" [src]="'data:image/png;base64,' + employeeProfile()?.profileImageBase64"> } @else { <span class="profile-avatar">{{ initials(currentEmployee()) }}</span> }<h2>{{ fullName() }}</h2><p>{{ currentEmployee().designation }}</p><div class="profile-divider"></div><div class="profile-detail"><span>EMPLOYEE ID</span><strong>{{ currentEmployee().employeeId }}</strong></div><div class="profile-detail"><span>EMAIL ADDRESS</span><strong>{{ currentEmployee().email }}</strong></div><div class="profile-detail"><span>FATHER</span><strong>{{ employeeProfile()?.fatherName || 'Not provided' }}</strong></div><div class="profile-detail"><span>MOTHER</span><strong>{{ employeeProfile()?.motherName || 'Not provided' }}</strong></div><div class="profile-detail"><span>DATE OF BIRTH</span><strong>{{ employeeProfile()?.dateOfBirth || 'Not provided' }}</strong></div><div class="profile-detail"><span>PERMANENT ADDRESS</span><strong>{{ employeeProfile()?.permanentAddress || 'Not provided' }}</strong></div></div></article><article class="panel profile-work"><p class="eyebrow">EDUCATION & SKILLS</p><h2>Profile details</h2><div class="snapshot-row"><span class="snapshot-icon icon-green">▤</span><span><strong>Education</strong><small>{{ employeeProfile()?.graduationQualification || 'Not provided' }}{{ employeeProfile()?.graduationSpecialization ? ' · ' + employeeProfile()?.graduationSpecialization : '' }}</small></span></div><div class="snapshot-row"><span class="snapshot-icon icon-blue">✦</span><span><strong>Skills</strong><small>{{ employeeProfile()?.skills?.join(', ') || 'Not provided' }}</small></span></div><div class="snapshot-row"><span class="snapshot-icon icon-coral">✓</span><span><strong>Certifications</strong><small>{{ employeeProfile()?.certifications?.join(', ') || 'Not provided' }}</small></span></div><div class="snapshot-row"><span><strong>Identity details</strong><small>Aadhaar: {{ employeeProfile()?.aadhaarNumber || 'Not provided' }} · PAN: {{ employeeProfile()?.panNumber || 'Not provided' }}</small></span></div></article></section>
+            } @else {
+              <section class="page-heading"><div><p class="eyebrow">PROFILE SETUP · {{ profileStep() | uppercase }}</p><h1>Complete your profile<span class="heading-period">.</span></h1><p class="page-subtitle">Your changes are saved to the employee database when you submit.</p></div><button class="button button-outline" type="button" (click)="cancelProfileEdit()">Cancel</button></section>
+              <div class="profile-stepper"><span [class.step-active]="profileStep() === 'personal'">1 · Personal</span><span [class.step-active]="profileStep() === 'education'">2 · Education</span><span [class.step-active]="profileStep() === 'skills'">3 · Skills</span><span [class.step-active]="profileStep() === 'additional'">4 · Additional</span></div>
+              <form class="profile-wizard" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+                @if (profileStep() === 'personal') {
+                  <div class="wizard-heading"><h2>Personal details</h2><p>Enter your family and contact information.</p></div>
+                  <div class="form-two-col"><div><label for="father-name">Father name</label><input id="father-name" formControlName="fatherName" autocomplete="off"></div><div><label for="mother-name">Mother name</label><input id="mother-name" formControlName="motherName" autocomplete="off"></div></div>
+                  <label for="permanent-address">Permanent address</label><textarea id="permanent-address" formControlName="permanentAddress" rows="3"></textarea>
+                  <label for="date-of-birth">Date of birth</label><input id="date-of-birth" type="date" formControlName="dateOfBirth">
+                  <label for="profile-image">Profile image (PNG, up to 3 MB)</label><input id="profile-image" type="file" accept="image/png,.png" (change)="chooseProfileImage($event)">
+                  @if (profileImageError()) { <span class="field-error">{{ profileImageError() }}</span> }
+                  @if (profileImageBase64()) { <img class="profile-photo-preview" alt="Selected profile image" [src]="'data:image/png;base64,' + profileImageBase64()"> }
+                }
+                @if (profileStep() === 'education') {
+                  <div class="wizard-heading"><h2>Education</h2><p>Enter your school, graduation, and postgraduate qualifications.</p></div>
+                  <div class="form-two-col"><div><label for="tenth-marks">10th marks (%)</label><input id="tenth-marks" type="number" min="0" max="100" step="0.01" formControlName="tenthMarks"></div><div><label for="intermediate-type">12th or diploma</label><select id="intermediate-type" formControlName="intermediateType"><option value="12th">12th</option><option value="Diploma">Diploma</option></select></div></div>
+                  <div class="form-two-col"><div><label for="intermediate-marks">{{ profileForm.controls.intermediateType.value }} marks (%)</label><input id="intermediate-marks" type="number" min="0" max="100" step="0.01" formControlName="intermediateMarks"></div><div><label for="education-group">Group / stream</label><input id="education-group" formControlName="educationGroup" placeholder="e.g. MPC, BiPC, CSE"></div></div>
+                  <label for="graduation-qualification">Graduation qualification</label><select id="graduation-qualification" formControlName="graduationQualification"><option value="">Select qualification</option><option>BE</option><option>B.Tech</option><option>BSc</option><option>BA</option><option>BCom</option><option>BCA</option><option>Other</option></select>
+                  <div class="form-two-col"><div><label for="graduation-specialization">Specialization (if applicable)</label><input id="graduation-specialization" formControlName="graduationSpecialization"></div><div><label for="graduation-group">Group / branch</label><input id="graduation-group" formControlName="graduationGroup"></div></div>
+                  <label class="check-field"><input type="checkbox" formControlName="postgraduateApplicable"> I have a postgraduate qualification</label>
+                  @if (profileForm.controls.postgraduateApplicable.value) { <div class="form-two-col"><div><label for="postgraduate-qualification">Postgraduate qualification</label><input id="postgraduate-qualification" formControlName="postgraduateQualification" placeholder="e.g. MBA, M.Tech, MSc"></div><div><label for="postgraduate-specialization">Specialization</label><input id="postgraduate-specialization" formControlName="postgraduateSpecialization"></div></div> }
+                }
+                @if (profileStep() === 'skills') {
+                  <div class="wizard-heading"><h2>Skills & certifications</h2><p>Add skills from the suggestions or enter your own.</p></div>
+                  <label for="skill-input">Add a skill</label><div class="input-action"><input id="skill-input" [value]="skillInput()" (input)="skillInput.set($any($event.target).value)" (keydown.enter)="$event.preventDefault(); addSkill()" placeholder="Type a skill"><button class="button button-outline" type="button" (click)="addSkill()">Add skill</button></div>
+                  <div class="suggestion-list"><span>Suggestions</span>@for (skill of skillSuggestions; track skill) { <button class="suggestion-chip" type="button" (click)="addSkill(skill)">{{ skill }}</button> }</div>
+                  <div class="selected-list">@for (skill of selectedSkills(); track skill) { <span class="selected-chip">{{ skill }}<button type="button" [attr.aria-label]="'Remove ' + skill" (click)="removeSkill(skill)">×</button></span> }</div>
+                  <label for="certification-input">Add a certification</label><div class="input-action"><input id="certification-input" [value]="certificationInput()" (input)="certificationInput.set($any($event.target).value)" (keydown.enter)="$event.preventDefault(); addCertification()" placeholder="Certification name"><button class="button button-outline" type="button" (click)="addCertification()">Add</button></div>
+                  <div class="selected-list">@for (certification of selectedCertifications(); track certification) { <span class="selected-chip">{{ certification }}<button type="button" [attr.aria-label]="'Remove ' + certification" (click)="removeCertification(certification)">×</button></span> }</div>
+                }
+                @if (profileStep() === 'additional') {
+                  <div class="wizard-heading"><h2>Additional details</h2><p>Enter identity details if you want them included in your employee profile.</p></div>
+                  <label for="aadhaar-number">Aadhaar number</label><input id="aadhaar-number" inputmode="numeric" maxlength="12" formControlName="aadhaarNumber" placeholder="12 digits">
+                  @if (profileForm.controls.aadhaarNumber.touched && profileForm.controls.aadhaarNumber.invalid) { <span class="field-error">Aadhaar must contain 12 digits.</span> }
+                  <label for="pan-number">PAN</label><input id="pan-number" maxlength="10" formControlName="panNumber" placeholder="ABCDE1234F">
+                  @if (profileForm.controls.panNumber.touched && profileForm.controls.panNumber.invalid) { <span class="field-error">Enter a valid PAN.</span> }
+                }
+                <div class="wizard-actions">
+                  @if (profileStep() !== 'personal') { <button class="button button-outline" type="button" (click)="previousProfileStep()">Back</button> }
+                  <span></span><button class="button button-primary" type="button" (click)="nextProfileStep()" [hidden]="profileStep() === 'additional'">Continue <span aria-hidden="true">→</span></button>
+                  @if (profileStep() === 'additional') { <button class="button button-primary" type="submit">Submit profile <span aria-hidden="true">↗</span></button> }
+                </div>
+              </form>
+            }
+          }
+        }
+      </div>
+    </main>
+  </div>
+  @if (leaveDialogOpen()) {
+    <div class="dialog-backdrop" role="presentation" (click)="leaveDialogOpen.set(false)"><section class="leave-dialog" role="dialog" aria-modal="true" aria-labelledby="leave-dialog-title" (click)="$event.stopPropagation()"><div class="dialog-heading"><div><p class="eyebrow">TIME AWAY</p><h2 id="leave-dialog-title">New leave request</h2></div><button class="dialog-close" type="button" aria-label="Close dialog" (click)="leaveDialogOpen.set(false)">×</button></div><form [formGroup]="leaveForm" (ngSubmit)="submitLeave()"><label for="leave-type">Leave type</label><select id="leave-type" formControlName="type"><option>Annual leave</option><option>Personal leave</option><option>Sick leave</option><option>Unpaid leave</option></select><div class="form-two-col"><div><label for="leave-start">Start date</label><input id="leave-start" type="date" formControlName="startDate"></div><div><label for="leave-end">End date</label><input id="leave-end" type="date" formControlName="endDate"></div></div>@if (leaveForm.touched && leaveForm.hasError('invalidDateRange')) { <span class="field-error">End date must be on or after the start date.</span> }<label for="leave-reason">Reason</label><textarea id="leave-reason" formControlName="reason" rows="3" placeholder="Add a note for your manager"></textarea><p class="leave-day-preview">{{ leaveWorkingDays() }} working days · Saturdays, Sundays, and public holidays are excluded.</p><div class="dialog-actions"><button class="button button-outline" type="button" (click)="leaveDialogOpen.set(false)">Cancel</button><button class="button button-primary" type="submit" [disabled]="leaveForm.invalid || leaveWorkingDays() === 0">Submit request <span aria-hidden="true">↗</span></button></div></form></section></div>
+  }
+}

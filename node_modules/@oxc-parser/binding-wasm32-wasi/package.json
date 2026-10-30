@@ -1,0 +1,47 @@
+{
+  "name": "@oxc-parser/binding-wasm32-wasi",
+  "version": "0.150.0",
+  "main": "parser.wasi.cjs",
+  "files": [
+    "parser.wasm32-wasi.wasm",
+    "parser.wasi.cjs",
+    "parser.wasi.d.cts",
+    "parser.wasi-browser.js",
+    "wasi-worker.mjs",
+    "wasi-worker-browser.mjs",
+    "browser-bundle.js"
+  ],
+  "description": "Oxc Parser Node API",
+  "keywords": [
+    "ast",
+    "estree",
+    "javascript",
+    "oxc",
+    "parser",
+    "typescript"
+  ],
+  "author": "Boshen and oxc contributors",
+  "homepage": "https://oxc.rs/docs/guide/usage/parser",
+  "license": "MIT",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=23.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oxc-project/oxc.git",
+    "directory": "napi/parser"
+  },
+  "bugs": "https://github.com/oxc-project/oxc/issues",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "types": "parser.wasi.d.cts",
+  "browser": "parser.wasi-browser.js",
+  "type": "module",
+  "dependencies": {
+    "@napi-rs/wasm-runtime": "~1.2.4",
+    "@emnapi/core": "2.0.0-alpha.3",
+    "@emnapi/runtime": "2.0.0-alpha.3"
+  }
+}

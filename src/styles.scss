@@ -1,0 +1,5 @@
+@use './app/app';
+
+html, body { min-height: 100%; margin: 0; }
+body { background: #f5f8f6; }
+button, input, select, textarea { font-family: inherit; }
