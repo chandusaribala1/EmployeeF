@@ -1,14 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { UpperCasePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Observable, firstValueFrom } from 'rxjs';
 import { AttendanceRecord, Employee, EmployeeProfile, EmployeeProfilePayload, LeaveRequest, PeopleApiService, PublicHoliday } from './people-api.service';
 
-type SectionKey = 'overview' | 'attendance' | 'leave' | 'holidays' | 'employees' | 'profile';
-type AuthMode = 'login' | 'register';
+type SectionKey = 'overview' | 'attendance' | 'leave' | 'resignation' | 'letters' | 'holidays' | 'profile';
+type AuthMode = 'login' | 'register' | 'forgot' | 'reset';
 type ProfileStep = 'view' | 'personal' | 'education' | 'skills' | 'additional';
-type AttendanceCalendarStatus = 'present' | 'exception' | 'half-day-leave' | 'full-day-leave' | 'holiday' | 'week-off' | 'no-record';
+type AttendanceCalendarStatus = 'present' | 'exception' | 'lop' | 'half-day-leave' | 'full-day-leave' | 'holiday' | 'week-off' | 'no-record';
 interface AttendanceCalendarDay {
   day: number;
   isoDate: string;
@@ -17,13 +16,17 @@ interface AttendanceCalendarDay {
   holidayName: string;
   today: boolean;
 }
+interface ResignationRow { id: string; employeeName: string; appliedDate: string; noticePeriod: number; tentativeDate: string; actualDate: string; approver: string; reason: string; comments: string; }
+interface ProfileSkillRow { name: string; type: string; level: string; }
+type ProfileFileKey = 'relievingLetter' | 'experienceCertificate' | 'aadhaarPhoto' | 'panPhoto' | 'passportPhoto' | 'resume' | 'resignationLetter' | 'profilePhoto' | 'cancelledCheque';
 
 const EMPTY_EMPLOYEE: Employee = { employeeId: '', firstName: '', lastName: '', designation: '', email: '' };
 
 @Component({
-  imports: [ReactiveFormsModule, UpperCasePipe],
+  imports: [ReactiveFormsModule],
   selector: 'app-root',
   templateUrl: './app.html',
+  host: { '(window:popstate)': 'restoreSectionFromHistory($event)' },
 })
 export class App {
   private readonly formBuilder = inject(FormBuilder);
@@ -34,6 +37,81 @@ export class App {
   protected readonly isAuthenticated = signal(false);
   protected readonly mobileMenuOpen = signal(false);
   protected readonly employees = signal<Employee[]>([]);
+  protected readonly employeeSearch = signal('');
+  protected readonly employeePage = signal(1);
+  protected readonly employeePageSize = 5;
+  protected readonly employeePageCount = computed(() => Math.max(1, Math.ceil(this.filteredEmployees().length / this.employeePageSize)));
+  protected readonly employeePageNumbers = computed(() => {
+    const total = this.employeePageCount();
+    const current = Math.min(this.employeePage(), total);
+    if (total <= 4) return Array.from({ length: total }, (_, index) => index + 1);
+    if (current <= 2) return [1, 2, 0, total];
+    if (current >= total - 1) return [1, 0, total - 1, total];
+    return [1, 0, current, 0, total];
+  });
+  protected readonly pagedEmployees = computed(() => {
+    const page = Math.min(this.employeePage(), this.employeePageCount());
+    return this.filteredEmployees().slice((page - 1) * this.employeePageSize, page * this.employeePageSize);
+  });
+  protected readonly employeePageStart = computed(() => this.filteredEmployees().length === 0 ? 0 : (Math.min(this.employeePage(), this.employeePageCount()) - 1) * this.employeePageSize + 1);
+  protected readonly employeePageEnd = computed(() => Math.min(this.employeePage() * this.employeePageSize, this.filteredEmployees().length));
+  protected readonly attendanceSearch = signal('');
+  protected readonly attendanceMonth = signal(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  protected readonly attendanceMonthTitle = computed(() => new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(this.attendanceMonth()));
+  protected readonly filteredEmployees = computed(() => {
+    const query = this.employeeSearch().trim().toLowerCase();
+    return this.employees()
+      .filter((employee) => `${employee.firstName} ${employee.lastName} ${employee.employeeId} ${employee.email} ${employee.designation}`.toLowerCase().includes(query))
+      .sort((left, right) => right.employeeId.localeCompare(left.employeeId, 'en', { numeric: true }));
+  });
+  protected readonly filteredAttendance = computed(() => [this.currentEmployee()].filter((employee) => `${employee.firstName} ${employee.lastName} ${employee.employeeId}`.toLowerCase().includes(this.attendanceSearch().toLowerCase())).map((employee) => {
+    const records = this.calendarAttendance().filter((record) => record.employeeId === employee.employeeId && record.workDate.startsWith(`${this.attendanceMonth().getFullYear()}-${String(this.attendanceMonth().getMonth() + 1).padStart(2, '0')}`));
+    const presentDays = records.filter((record) => record.status === 'Present' || record.status === 'Late').length;
+    const leaveDays = records.filter((record) => record.status === 'On leave' || record.status === 'Half day leave').length;
+    const workingDays = this.countMonthWorkingDays(this.attendanceMonth());
+    return { employee, workingDays, presentDays, leaveDays, lopDays: records.filter(record => record.status === 'LOP').length };
+  }));
+  protected readonly resignations = signal<ResignationRow[]>([]);
+  protected readonly profileTab = signal('Basic Information');
+  protected readonly profileSkills = signal<ProfileSkillRow[]>([]);
+  protected readonly selectedProfileFiles = signal<Record<string, string>>({});
+  protected readonly profileFileData = signal<Record<string, string>>({});
+  protected readonly profileFileDates = signal<Record<string, string>>({});
+  protected readonly employeeDocumentFields: { key: ProfileFileKey; label: string }[] = [
+    { key: 'relievingLetter', label: 'Relieving letter' }, { key: 'experienceCertificate', label: 'Experience certificate' },
+    { key: 'aadhaarPhoto', label: 'Aadhaar photo' }, { key: 'panPhoto', label: 'PAN photo' },
+    { key: 'passportPhoto', label: 'Passport photo' }, { key: 'resume', label: 'Updated resume' },
+    { key: 'resignationLetter', label: 'Resignation acceptance letter' }, { key: 'profilePhoto', label: 'Passport size photo' },
+    { key: 'cancelledCheque', label: 'Cancelled cheque' },
+  ];
+  protected readonly letterFields: { key: ProfileFileKey; label: string }[] = [
+    { key: 'relievingLetter', label: 'Relieving letter' },
+    { key: 'experienceCertificate', label: 'Experience certificate' },
+    { key: 'resignationLetter', label: 'Resignation acceptance letter' },
+  ];
+  protected readonly myLetters = computed(() => this.letterFields
+    .filter((field) => !!this.selectedProfileFiles()[field.key])
+    .map((field) => ({ ...field, fileName: this.selectedProfileFiles()[field.key], date: this.profileFileDates()[field.key] ?? '' })));
+  protected readonly letterPage = signal(1);
+  protected readonly letterPageSize = signal(10);
+  protected readonly letterPageCount = computed(() => Math.max(1, Math.ceil(this.myLetters().length / this.letterPageSize())));
+  protected readonly pagedLetters = computed(() => this.myLetters().slice((this.letterPage() - 1) * this.letterPageSize(), this.letterPage() * this.letterPageSize()));
+  protected readonly letterPageStart = computed(() => this.myLetters().length === 0 ? 0 : (this.letterPage() - 1) * this.letterPageSize() + 1);
+  protected readonly letterPageEnd = computed(() => Math.min(this.letterPage() * this.letterPageSize(), this.myLetters().length));
+  protected readonly employeeForm = this.formBuilder.nonNullable.group({
+    personalEmail: [''], phoneNumber: [''], bloodGroup: [''], maritalStatus: [''], emergencyContact1: [''], emergencyContact2: [''],
+    currentAddress: [''], currentPincode: [''], currentCountry: [''], currentCity: [''], sameAddress: [false], permanentAddress: [''], permanentPincode: [''], permanentCountry: [''], permanentCity: [''],
+    previousEmployee: [false], organization: [''], previousDesignation: [''], department: [''], lastCtc: [''], joiningDate: [''], lwd: [''], previousSkillName: [''], relievingLetter: [''], experienceCertificate: [''],
+    degree: [''], higherQualification: [''], universityName: [''], passedOutYear: [''], aadhaarNumber: [''], aadhaarPhoto: [''], panNumber: [''], panPhoto: [''], passportNumber: [''], passportPhoto: [''], resume: [''], resignationLetter: [''], profilePhoto: [''], bankIfsc: [''], cancelledCheque: [''],
+  });
+  protected readonly resignationForm = this.formBuilder.nonNullable.group({ appliedDate: [this.localDateString(new Date()), Validators.required], reason: ['', Validators.required], comments: [''] });
+  protected readonly resignationEditingId = signal<string | null>(null);
+  protected readonly resignationNoticePeriod = 15;
+  protected readonly tentativeRelievingDate = computed(() => this.addDays(this.resignationForm.controls.appliedDate.value, this.resignationNoticePeriod));
+  protected readonly resetEmailForm = this.formBuilder.nonNullable.group({ email: ['', [Validators.required, Validators.email]] });
+  protected readonly resetPasswordForm = this.formBuilder.nonNullable.group({ password: ['', [Validators.required, Validators.minLength(6)]], confirmPassword: ['', Validators.required], otp: ['', Validators.required] }, { validators: group => group.get('password')?.value === group.get('confirmPassword')?.value ? null : { passwordMismatch: true } });
+  protected readonly resetToken = signal('');
+  protected readonly resetOtpStep = signal(false);
   protected readonly attendance = signal<AttendanceRecord[]>([]);
   protected readonly calendarAttendance = signal<AttendanceRecord[]>([]);
   protected readonly calendarMonth = signal(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -43,7 +121,7 @@ export class App {
     const year = month.getFullYear();
     const monthIndex = month.getMonth();
     const prefix = `${year}-${String(monthIndex + 1).padStart(2, '0')}-`;
-    const records = new Map(this.calendarAttendance().filter((record) => record.workDate.startsWith(prefix)).map((record) => [record.workDate, record]));
+    const records = new Map(this.calendarAttendance().filter((record) => record.employeeId === this.currentEmployee().employeeId && record.workDate.startsWith(prefix)).map((record) => [record.workDate, record]));
     const holidays = new Map(this.publicHolidays().filter((holiday) => holiday.date.startsWith(prefix)).map((holiday) => [holiday.date, holiday.name]));
     const today = this.localDateString(new Date());
     const leadingDays = new Date(year, monthIndex, 1).getDay();
@@ -60,6 +138,7 @@ export class App {
       let label = 'No record';
       if (record?.status === 'Present') { status = 'present'; label = 'Present'; }
       else if (record?.status === 'Late') { status = 'exception'; label = 'Exception'; }
+      else if (record?.status === 'LOP') { status = 'lop'; label = 'LOP · missed checkout'; }
       else if (record?.status === 'Half day leave') { status = 'half-day-leave'; label = 'Half day leave'; }
       else if (record?.status === 'On leave') { status = 'full-day-leave'; label = 'Full day leave'; }
       else if (holidayName) { status = 'holiday'; label = holidayName; }
@@ -73,7 +152,7 @@ export class App {
   protected readonly publicHolidays = signal<PublicHoliday[]>([]);
   protected readonly upcomingHolidays = computed(() => {
     const today = this.localDateString(new Date());
-    return this.publicHolidays().filter((holiday) => holiday.date >= today).slice(0, 5);
+    return this.publicHolidays().filter((holiday) => holiday.date.startsWith(`${this.holidayYear}-`) && holiday.date >= today).slice(0, 5);
   });
   protected readonly employeeProfile = signal<EmployeeProfile | null>(null);
   protected readonly currentEmployee = signal<Employee>(EMPTY_EMPLOYEE);
@@ -90,20 +169,20 @@ export class App {
   protected readonly leaveDialogOpen = signal(false);
   protected readonly holidayEditorOpen = signal(false);
   protected readonly holidayFilter = signal<'upcoming' | 'all'>('upcoming');
-  protected readonly holidayYear = signal(new Date().getFullYear());
+  protected readonly holidayYear = new Date().getFullYear();
   protected readonly holidayRows = computed(() => {
     const today = this.localDateString(new Date());
     return this.publicHolidays()
-      .filter((holiday) => holiday.date.startsWith(`${this.holidayYear()}-`))
+      .filter((holiday) => holiday.date.startsWith(`${this.holidayYear}-`))
       .filter((holiday) => this.holidayFilter() === 'all' || holiday.date >= today)
       .sort((left, right) => left.date.localeCompare(right.date));
   });
   protected readonly upcomingHolidayCount = computed(() => {
     const today = this.localDateString(new Date());
-    return this.publicHolidays().filter((holiday) => holiday.date.startsWith(`${this.holidayYear()}-`) && holiday.date >= today).length;
+    return this.publicHolidays().filter((holiday) => holiday.date.startsWith(`${this.holidayYear}-`) && holiday.date >= today).length;
   });
   protected readonly presentCount = computed(() => this.attendance().filter((entry) => entry.status === 'Present').length);
-  protected readonly pendingLeaveCount = computed(() => this.leaveRequests().filter((request) => request.status === 'Pending').length);
+  protected readonly pendingLeaveCount = computed(() => this.leaveRequests().filter((request) => request.employeeId === this.currentEmployee().employeeId && request.status === 'Pending').length);
   protected readonly designations = computed(() => [...new Set(this.employees().map((employee) => employee.designation))].sort((left, right) => left.localeCompare(right)));
   protected readonly isHr = computed(() => /\bhr\b|human resources?/i.test(this.currentEmployee().designation));
   protected readonly todayLabel = new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date());
@@ -124,9 +203,12 @@ export class App {
   }, { validators: (group) => group.get('password')?.value === group.get('confirmPassword')?.value ? null : { passwordMismatch: true } });
 
   protected readonly leaveForm = this.formBuilder.nonNullable.group({
-    type: ['Annual leave', Validators.required],
+    requestType: ['Leave', Validators.required],
+    type: ['Personal leave', Validators.required],
     startDate: ['', Validators.required],
     endDate: ['', Validators.required],
+    fromSession: ['First half', Validators.required],
+    toSession: ['Second half', Validators.required],
     reason: ['', Validators.required],
   }, { validators: (group) => {
     const startDate = group.get('startDate')?.value;
@@ -160,11 +242,12 @@ export class App {
   });
 
   protected readonly navigation: { key: SectionKey; label: string; icon: string }[] = [
-    { key: 'overview', label: 'Overview', icon: '◫' },
+    { key: 'overview', label: 'Dashboard', icon: '◫' },
     { key: 'attendance', label: 'Attendance', icon: '◷' },
     { key: 'leave', label: 'Leave requests', icon: '▤' },
+    { key: 'resignation', label: 'Employee resignation', icon: '↗' },
+    { key: 'letters', label: 'Letters', icon: '▧' },
     { key: 'holidays', label: 'Public holidays', icon: '☼' },
-    { key: 'employees', label: 'Employees', icon: '♙' },
     { key: 'profile', label: 'My profile', icon: '◎' },
   ];
 
@@ -172,6 +255,120 @@ export class App {
     this.authMode.set(mode);
     this.notice.set('');
   }
+
+  protected updateLeaveRequestType(): void {
+    if (this.leaveForm.controls.requestType.value === 'WorkFromHome') this.leaveForm.controls.type.setValue('WorkFromHome');
+    else this.leaveForm.controls.type.setValue('Personal leave');
+  }
+
+  protected changeAttendanceMonth(offset: number): void {
+    const month = this.attendanceMonth();
+    const next = new Date(month.getFullYear(), month.getMonth() + offset, 1);
+    this.attendanceMonth.set(next);
+    void this.loadCalendarAttendance(next);
+  }
+
+  protected async resetCheckIn(): Promise<void> {
+    const id = this.currentEmployee().employeeId;
+    await this.performApi(this.api.resetTodayAttendance(id), () => {
+      this.attendance.update(items => items.filter(item => item.employeeId !== id));
+      this.calendarAttendance.update(items => items.filter(item => !(item.employeeId === id && item.workDate === this.localDateString(new Date()))));
+    }, 'Could not reset today\'s attendance.');
+  }
+
+  protected downloadLetter(field: ProfileFileKey): void {
+    const data = this.profileFileData()[field];
+    const name = this.selectedProfileFiles()[field];
+    if (!data || !name) { this.notice.set('This letter has not been uploaded to your profile yet.'); return; }
+    const link = document.createElement('a');
+    link.href = data;
+    link.download = name;
+    link.click();
+  }
+
+  protected saveResignation(): void {
+    if (this.resignationForm.invalid) { this.resignationForm.markAllAsTouched(); return; }
+    const form = this.resignationForm.getRawValue();
+    const entry = { id: this.resignationEditingId() ?? crypto.randomUUID(), employeeName: this.fullName(), appliedDate: form.appliedDate, noticePeriod: this.resignationNoticePeriod, tentativeDate: this.tentativeRelievingDate(), actualDate: this.tentativeRelievingDate(), approver: 'Manager not assigned', reason: form.reason, comments: form.comments };
+    const rows = this.resignationEditingId() ? this.resignations().map(row => row.id === entry.id ? entry : row) : [entry, ...this.resignations()];
+    this.resignations.set(rows);
+    localStorage.setItem(`resignations:${this.currentEmployee().employeeId}`, JSON.stringify(rows));
+    this.resignationEditingId.set(null);
+    this.resignationForm.reset({ appliedDate: this.localDateString(new Date()), reason: '', comments: '' });
+    this.notice.set('Resignation request saved.');
+  }
+
+  protected editResignation(item: ResignationRow): void {
+    this.resignationEditingId.set(item.id);
+    this.resignationForm.reset({ appliedDate: item.appliedDate, reason: item.reason, comments: item.comments });
+  }
+
+  protected deleteResignation(id: string): void {
+    const rows = this.resignations().filter(item => item.id !== id);
+    this.resignations.set(rows);
+    localStorage.setItem(`resignations:${this.currentEmployee().employeeId}`, JSON.stringify(rows));
+  }
+
+  protected async requestPasswordReset(): Promise<void> {
+    if (this.resetEmailForm.invalid) { this.resetEmailForm.markAllAsTouched(); return; }
+    try {
+      await firstValueFrom(this.api.requestPasswordReset(this.resetEmailForm.controls.email.value));
+      this.notice.set('If this email belongs to an account, a password reset link has been sent.');
+    } catch (error) { this.notice.set(this.apiErrorMessage(error) ?? 'Could not send the reset email. Check the employee service mail settings.'); }
+  }
+
+  protected async submitPasswordReset(): Promise<void> {
+    if (!this.resetOtpStep()) {
+      if (this.resetPasswordForm.controls.password.invalid || this.resetPasswordForm.hasError('passwordMismatch')) { this.resetPasswordForm.markAllAsTouched(); return; }
+      try {
+        await firstValueFrom(this.api.resetPassword({ token: this.resetToken(), email: this.resetEmailForm.controls.email.value, password: this.resetPasswordForm.controls.password.value }));
+        this.resetOtpStep.set(true);
+        this.notice.set('A verification code was sent to your registered email. Enter it to finish resetting your password.');
+      } catch (error) { this.notice.set(this.apiErrorMessage(error) ?? 'The reset link is invalid or expired.'); }
+      return;
+    }
+    if (this.resetPasswordForm.controls.otp.invalid) { this.resetPasswordForm.controls.otp.markAsTouched(); return; }
+    try {
+      await firstValueFrom(this.api.verifyPasswordResetOtp({ email: this.resetEmailForm.controls.email.value, otp: this.resetPasswordForm.controls.otp.value }));
+      this.setAuthMode('login');
+      this.loginForm.reset();
+      this.notice.set('Password reset verified. Sign in with your new password.');
+      this.resetOtpStep.set(false);
+      this.resetToken.set('');
+    } catch (error) { this.notice.set(this.apiErrorMessage(error) ?? 'The one-time code is invalid or expired.'); }
+  }
+
+  protected saveEmployeeProfile(): void {
+    const id = this.currentEmployee().employeeId;
+    localStorage.setItem(`employee-profile:${id}`, JSON.stringify({ ...this.employeeForm.getRawValue(), skills: this.profileSkills(), files: this.profileFileData(), uploadedAt: this.profileFileDates() }));
+    this.notice.set('Employee profile saved.');
+  }
+
+  protected setProfileFile(field: 'relievingLetter' | 'experienceCertificate' | 'aadhaarPhoto' | 'panPhoto' | 'passportPhoto' | 'resume' | 'resignationLetter' | 'profilePhoto' | 'cancelledCheque', event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { this.notice.set('Choose a document no larger than 2 MB.'); input.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      this.employeeForm.controls[field].setValue(file.name);
+      this.selectedProfileFiles.update(files => ({ ...files, [field]: file.name }));
+      this.profileFileData.update(files => ({ ...files, [field]: reader.result as string }));
+      this.profileFileDates.update(dates => ({ ...dates, [field]: this.localDateString(new Date()) }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  protected toggleSameAddress(): void {
+    if (!this.employeeForm.controls.sameAddress.value) return;
+    const current = this.employeeForm.getRawValue();
+    this.employeeForm.patchValue({ permanentAddress: current.currentAddress, permanentPincode: current.currentPincode, permanentCountry: current.currentCountry, permanentCity: current.currentCity });
+  }
+
+  protected addProfileSkill(): void { this.profileSkills.update(rows => [...rows, { name: '', type: '', level: '' }]); }
+  protected updateProfileSkill(index: number, field: keyof ProfileSkillRow, value: string): void { this.profileSkills.update(rows => rows.map((row, i) => i === index ? { ...row, [field]: value } : row)); }
+  protected removeProfileSkill(index: number): void { this.profileSkills.update(rows => rows.filter((_, i) => i !== index)); }
 
   protected async login(): Promise<void> {
     if (this.loginForm.invalid) {
@@ -212,7 +409,30 @@ export class App {
   }
 
   protected selectSection(section: SectionKey): void {
+    if (this.activeSection() !== section) {
+      history.pushState({ ...(history.state ?? {}), peopleSection: section }, '', location.pathname);
+    }
     this.activeSection.set(section);
+    sessionStorage.setItem('people-section', section);
+    this.mobileMenuOpen.set(false);
+    this.notice.set('');
+  }
+
+  protected setEmployeeSearch(value: string): void {
+    this.employeeSearch.set(value);
+    this.employeePage.set(1);
+  }
+
+  protected setEmployeePage(page: number): void {
+    this.employeePage.set(Math.max(1, Math.min(page, this.employeePageCount())));
+  }
+
+  protected restoreSectionFromHistory(event: PopStateEvent): void {
+    if (!this.isAuthenticated()) return;
+    const section = event.state?.peopleSection;
+    const nextSection = this.navigation.some((item) => item.key === section) ? section as SectionKey : 'overview';
+    this.activeSection.set(nextSection);
+    sessionStorage.setItem('people-section', nextSection);
     this.mobileMenuOpen.set(false);
     this.notice.set('');
   }
@@ -224,8 +444,26 @@ export class App {
     void this.loadCalendarAttendance(nextMonth);
   }
 
-  protected shiftHolidayYear(offset: number): void {
-    this.holidayYear.update((year) => year + offset);
+  protected setLetterPage(page: number): void {
+    this.letterPage.set(Math.max(1, Math.min(page, this.letterPageCount())));
+  }
+
+  protected setLetterPageSize(value: string): void {
+    const pageSize = Number(value);
+    if (!Number.isInteger(pageSize) || pageSize < 1) return;
+    this.letterPageSize.set(pageSize);
+    this.letterPage.set(1);
+  }
+
+  protected goToLetterPage(value: string): void {
+    const page = Number(value);
+    if (Number.isInteger(page)) this.setLetterPage(page);
+  }
+
+  protected formatLetterDate(isoDate: string): string {
+    const [year, month, day] = isoDate.split('-').map(Number);
+    if (!year || !month || !day) return '—';
+    return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(year, month - 1, day));
   }
 
   protected holidayDay(isoDate: string): string { return String(Number(isoDate.slice(8, 10))); }
@@ -251,14 +489,42 @@ export class App {
       this.leaveForm.markAllAsTouched();
       return;
     }
-    const payload = { ...this.leaveForm.getRawValue(), employeeId: this.currentEmployee().employeeId };
-    const saved = await this.performApi(this.api.createLeaveRequest(payload),
-      (request) => this.leaveRequests.update((items) => [request, ...items]), 'Could not save leave request.');
+    const form = this.leaveForm.getRawValue();
+    const payload = { employeeId: this.currentEmployee().employeeId, type: form.requestType === 'WorkFromHome' ? 'WorkFromHome' : form.type, requestType: form.requestType as 'WorkFromHome' | 'Leave', leaveType: form.requestType === 'Leave' ? form.type as 'Personal leave' | 'Sick leave' : null, fromSession: form.fromSession as 'First half' | 'Second half', toSession: form.toSession as 'First half' | 'Second half', startDate: form.startDate, endDate: form.endDate, reason: form.reason };
+    const saved = this.editingLeaveId()
+      ? await this.performApi(this.api.editLeaveRequest(this.editingLeaveId()!, payload), request => this.leaveRequests.update(items => items.map(item => item.id === request.id ? request : item)), 'Could not update leave request.')
+      : await this.performApi(this.api.createLeaveRequest(payload), request => this.leaveRequests.update(items => [request, ...items]), 'Could not save leave request.');
     if (saved) {
       this.leaveDialogOpen.set(false);
-      this.leaveForm.reset({ type: 'Annual leave', startDate: '', endDate: '', reason: '' });
+      this.editingLeaveId.set(null);
+      this.leaveForm.reset({ requestType: 'Leave', type: 'Personal leave', startDate: '', endDate: '', fromSession: 'First half', toSession: 'Second half', reason: '' });
     }
   }
+
+  protected editLeave(request: LeaveRequest): void {
+    this.leaveForm.reset({ requestType: request.requestType ?? (request.type === 'WorkFromHome' ? 'WorkFromHome' : 'Leave'), type: request.leaveType ?? 'Personal leave', startDate: request.startDate, endDate: request.endDate, fromSession: request.fromSession ?? 'First half', toSession: request.toSession ?? 'Second half', reason: request.reason ?? '' });
+    this.editingLeaveId.set(request.id);
+    this.leaveDialogOpen.set(true);
+  }
+
+  protected openNewLeave(): void {
+    this.editingLeaveId.set(null);
+    this.leaveForm.reset({ requestType: 'Leave', type: 'Personal leave', startDate: '', endDate: '', fromSession: 'First half', toSession: 'Second half', reason: '' });
+    this.leaveDialogOpen.set(true);
+  }
+
+  protected closeLeaveDialog(): void {
+    this.leaveDialogOpen.set(false);
+    this.editingLeaveId.set(null);
+  }
+
+  protected async deleteLeave(request: LeaveRequest): Promise<void> {
+    await this.performApi(this.api.deleteLeaveRequest(request.id, this.currentEmployee().employeeId), () => {
+      this.leaveRequests.update(items => items.filter(item => item.id !== request.id));
+    }, 'Could not delete leave request.');
+  }
+
+  protected readonly editingLeaveId = signal<string | null>(null);
 
   protected async updateLeave(request: LeaveRequest, status: 'Approved' | 'Declined'): Promise<void> {
     await this.performApi(this.api.updateLeaveRequest(request.id, { status, reviewerEmployeeId: this.currentEmployee().employeeId }),
@@ -272,6 +538,10 @@ export class App {
       return;
     }
     const payload = { ...this.holidayForm.getRawValue(), employeeId: this.currentEmployee().employeeId };
+    if (!payload.date.startsWith(`${this.holidayYear}-`)) {
+      this.notice.set(`Choose a date in ${this.holidayYear}.`);
+      return;
+    }
     const saved = await this.performApi(this.api.createPublicHoliday(payload), (holiday) => {
       this.publicHolidays.update((items) => [...items, holiday].sort((left, right) => left.date.localeCompare(right.date)));
     }, 'Could not save the public holiday.');
@@ -424,15 +694,9 @@ export class App {
     }, 'Could not save profile details.');
   }
 
-  protected async removeEmployee(employee: Employee): Promise<void> {
-    await this.performApi(this.api.deleteEmployee(employee.employeeId), () => {
-      this.employees.update((items) => items.filter((item) => item.employeeId !== employee.employeeId));
-      this.attendance.update((items) => items.filter((item) => item.employeeId !== employee.employeeId));
-      this.leaveRequests.update((items) => items.filter((item) => item.employeeId !== employee.employeeId));
-    }, 'Could not remove employee.');
-  }
-
   protected signOut(): void {
+    sessionStorage.removeItem('people-employee');
+    sessionStorage.removeItem('people-section');
     this.isAuthenticated.set(false);
     this.authMode.set('login');
     this.currentEmployee.set(EMPTY_EMPLOYEE);
@@ -442,6 +706,8 @@ export class App {
     this.leaveRequests.set([]);
     this.publicHolidays.set([]);
     this.employeeProfile.set(null);
+    this.employeeSearch.set('');
+    this.employeePage.set(1);
     this.notice.set('');
   }
 
@@ -468,10 +734,59 @@ export class App {
   }
 
   private enterDashboard(employee: Employee): void {
+    this.employeeForm.reset();
+    this.profileSkills.set([]);
+    this.profileFileData.set({});
+    this.selectedProfileFiles.set({});
+    this.profileFileDates.set({});
     this.currentEmployee.set(employee);
     this.isAuthenticated.set(true);
     this.activeSection.set('overview');
+    sessionStorage.setItem('people-section', 'overview');
+    sessionStorage.setItem('people-employee', JSON.stringify(employee));
+    history.replaceState({ ...(history.state ?? {}), peopleSection: 'overview' }, '', location.pathname);
+    try { this.resignations.set(JSON.parse(localStorage.getItem(`resignations:${employee.employeeId}`) ?? '[]')); } catch { this.resignations.set([]); }
+    try {
+      const saved = JSON.parse(localStorage.getItem(`employee-profile:${employee.employeeId}`) ?? '{}') as Record<string, unknown>;
+      const { skills, files, uploadedAt, relievingLetter, experienceCertificate, aadhaarPhoto, panPhoto, passportPhoto, resume, resignationLetter, profilePhoto, cancelledCheque, ...fields } = saved;
+      this.employeeForm.patchValue(fields as Partial<typeof this.employeeForm.value>);
+      const fileNames: Record<string, string> = {};
+      for (const key of ['relievingLetter', 'experienceCertificate', 'aadhaarPhoto', 'panPhoto', 'passportPhoto', 'resume', 'resignationLetter', 'profilePhoto', 'cancelledCheque']) {
+        const value = saved[key];
+        if (typeof value === 'string') fileNames[key] = value;
+      }
+      this.selectedProfileFiles.set(fileNames);
+      this.profileFileData.set(files && typeof files === 'object' ? files as Record<string, string> : {});
+      this.profileFileDates.set(uploadedAt && typeof uploadedAt === 'object' ? uploadedAt as Record<string, string> : {});
+      this.profileSkills.set(Array.isArray(skills) ? skills as ProfileSkillRow[] : []);
+    } catch { this.profileSkills.set([]); }
     void this.loadRemoteData();
+  }
+
+  constructor() {
+    const query = new URLSearchParams(location.search);
+    const token = query.get('resetToken');
+    const email = query.get('email');
+    if (token) {
+      this.resetToken.set(token);
+      this.authMode.set('reset');
+      if (email) this.resetEmailForm.controls.email.setValue(email);
+      history.replaceState({ ...(history.state ?? {}), passwordReset: true }, '', location.pathname);
+    }
+    if (!token) {
+      try {
+        const saved = sessionStorage.getItem('people-employee');
+        if (saved) {
+          const savedSection = sessionStorage.getItem('people-section') as SectionKey | null;
+          this.enterDashboard(JSON.parse(saved) as Employee);
+          if (savedSection && this.navigation.some(item => item.key === savedSection)) {
+            this.activeSection.set(savedSection);
+            sessionStorage.setItem('people-section', savedSection);
+            history.replaceState({ ...(history.state ?? {}), peopleSection: savedSection }, '', location.pathname);
+          }
+        }
+      } catch { sessionStorage.removeItem('people-employee'); }
+    }
   }
 
   private async loadRemoteData(): Promise<void> {
@@ -482,7 +797,7 @@ export class App {
         firstValueFrom(this.api.getEmployees()),
         firstValueFrom(this.api.getAttendance(employeeId)),
         firstValueFrom(this.api.getAttendanceMonth(employeeId, month.getFullYear(), month.getMonth() + 1)),
-        firstValueFrom(this.api.getLeaveRequests()),
+        firstValueFrom(this.api.getLeaveRequests(employeeId)),
         firstValueFrom(this.api.getPublicHolidays()),
         firstValueFrom(this.api.getEmployeeProfile(employeeId)),
       ]);
@@ -551,6 +866,24 @@ export class App {
       date.setUTCDate(date.getUTCDate() + 1);
     }
     return count;
+  }
+
+  private countMonthWorkingDays(month: Date): number {
+    let count = 0;
+    for (let day = 1; day <= new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate(); day++) {
+      const date = new Date(month.getFullYear(), month.getMonth(), day);
+      const isoDate = this.localDateString(date);
+      const isHoliday = this.publicHolidays().some(holiday => holiday.date === isoDate);
+      if (date.getDay() !== 0 && date.getDay() !== 6 && !isHoliday) count++;
+    }
+    return count;
+  }
+
+  private addDays(isoDate: string, days: number): string {
+    if (!isoDate) return '';
+    const date = new Date(`${isoDate}T00:00:00`);
+    date.setDate(date.getDate() + days);
+    return this.localDateString(date);
   }
 
   private localDateString(date: Date): string {

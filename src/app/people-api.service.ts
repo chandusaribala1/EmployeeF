@@ -17,7 +17,7 @@ export interface AttendanceRecord {
   workDate: string;
   checkIn: string;
   checkOut: string;
-  status: 'Present' | 'Late' | 'On leave' | 'Half day leave';
+  status: 'Present' | 'Late' | 'On leave' | 'Half day leave' | 'LOP';
 }
 
 export interface LeaveRequest {
@@ -25,6 +25,10 @@ export interface LeaveRequest {
   employeeId: string;
   employeeName: string;
   type: string;
+  requestType: 'WorkFromHome' | 'Leave';
+  leaveType: 'Personal leave' | 'Sick leave' | null;
+  fromSession: 'First half' | 'Second half' | null;
+  toSession: 'First half' | 'Second half' | null;
   startDate: string;
   endDate: string;
   days: number;
@@ -76,6 +80,10 @@ interface RegisterPayload {
 export interface LeaveRequestPayload {
   employeeId: string;
   type: string;
+  requestType: 'WorkFromHome' | 'Leave';
+  leaveType: 'Personal leave' | 'Sick leave' | null;
+  fromSession: 'First half' | 'Second half';
+  toSession: 'First half' | 'Second half';
   startDate: string;
   endDate: string;
   reason: string;
@@ -103,8 +111,16 @@ export class PeopleApiService {
     return this.http.get<Employee[]>(`${this.baseUrl}/employees`);
   }
 
-  deleteEmployee(employeeId: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/employees/${encodeURIComponent(employeeId)}`);
+  requestPasswordReset(email: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/auth/forgot-password`, { email });
+  }
+
+  resetPassword(payload: { token: string; email: string; password: string }): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/auth/reset-password`, payload);
+  }
+
+  verifyPasswordResetOtp(payload: { email: string; otp: string }): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/auth/verify-reset-otp`, payload);
   }
 
   getAttendance(employeeId: string): Observable<AttendanceRecord[]> {
@@ -124,8 +140,12 @@ export class PeopleApiService {
     return this.http.put<AttendanceRecord>(`${this.baseUrl}/attendance/${encodeURIComponent(employeeId)}/check-out`, {});
   }
 
-  getLeaveRequests(): Observable<LeaveRequest[]> {
-    return this.http.get<LeaveRequest[]>(`${this.baseUrl}/leave-requests`);
+  getLeaveRequests(employeeId: string): Observable<LeaveRequest[]> {
+    return this.http.get<LeaveRequest[]>(`${this.baseUrl}/leave-requests?employeeId=${encodeURIComponent(employeeId)}`);
+  }
+
+  resetTodayAttendance(employeeId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/attendance/${encodeURIComponent(employeeId)}/today`);
   }
 
   createLeaveRequest(payload: LeaveRequestPayload): Observable<LeaveRequest> {
@@ -134,6 +154,14 @@ export class PeopleApiService {
 
   updateLeaveRequest(requestId: string, payload: { status: 'Approved' | 'Declined'; reviewerEmployeeId: string }): Observable<LeaveRequest> {
     return this.http.put<LeaveRequest>(`${this.baseUrl}/leave-requests/${encodeURIComponent(requestId)}`, payload);
+  }
+
+  editLeaveRequest(requestId: string, payload: LeaveRequestPayload): Observable<LeaveRequest> {
+    return this.http.put<LeaveRequest>(`${this.baseUrl}/leave-requests/${encodeURIComponent(requestId)}/details`, payload);
+  }
+
+  deleteLeaveRequest(requestId: string, employeeId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/leave-requests/${encodeURIComponent(requestId)}?employeeId=${encodeURIComponent(employeeId)}`);
   }
 
   getPublicHolidays(): Observable<PublicHoliday[]> {

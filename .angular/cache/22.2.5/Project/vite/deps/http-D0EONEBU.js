@@ -1,6 +1,66 @@
 import { Ac as Injector, Al as ɵɵdefineInjectable, Bt as computed, Cl as runInInjectionContext, Cr as TracingService, Ei as performanceMarkFeature, Fn as Injectable, Jc as TransferState, Kc as RuntimeError, Lt as ResourceImpl, Ol as truncateMiddle, Pl as ɵɵinject, Pn as Inject, Rc as NgZone, Tl as signal, Uc as PendingTasks, Vt as encapsulateResourceError, Wi as setClassMetadata, Wt as linkedSignal, Yt as APP_BOOTSTRAP_LISTENER, _c as DOCUMENT, _l as makeEnvironmentProviders, al as formatRuntimeError, ao as ɵɵdefineNgModule, dl as inject, dr as Service, el as assertInInjectionContext, hc as CSP_NONCE, jl as ɵɵdefineInjector, kc as InjectionToken, qn as NgModule, qt as untracked, so as ɵɵdefineService, tn as ApplicationRef, vc as DestroyRef, vl as makeStateKey, xc as EnvironmentInjector } from "./core-B1xIAREJ.js";
 import { Xt as filter, b as switchMap, jn as of, jt as concatMap, ot as finalize, rr as Observable, vn as map } from "./esm5-Doa4YBQt.js";
-import { n as parseCookieValue, o as PlatformLocation, t as XhrFactory } from "./_xhr-chunk-DHfHEdQ0.js";
+import { r as PlatformLocation } from "./_platform_location-chunk-DIjwKgrk.js";
+// node_modules/@angular/common/fesm2022/_xhr-chunk.mjs
+/**
+* @license Angular v22.2.4
+* (c) 2010-2026 Google LLC. https://angular.dev/
+* License: MIT
+*/
+function parseCookieValue(cookieStr, name) {
+	name = encodeURIComponent(name);
+	for (const cookie of cookieStr.split(";")) {
+		const eqIndex = cookie.indexOf("=");
+		const [cookieName, cookieValue] = eqIndex == -1 ? [cookie, ""] : [cookie.slice(0, eqIndex), cookie.slice(eqIndex + 1)];
+		if (cookieName.trim() !== name) continue;
+		let value = cookieValue;
+		try {
+			value = decodeURIComponent(cookieValue);
+		} catch {}
+		if (value.length > 1 && value[0] === "\"" && value[value.length - 1] === "\"") value = value.slice(1, -1);
+		return value;
+	}
+	return null;
+}
+var BrowserXhr = class BrowserXhr {
+	build() {
+		return new XMLHttpRequest();
+	}
+	static ɵfac = function BrowserXhr_Factory(__ngFactoryType__) {
+		return new (__ngFactoryType__ || BrowserXhr)();
+	};
+	static ɵprov = /*@__PURE__*/ ɵɵdefineService({
+		token: BrowserXhr,
+		factory: BrowserXhr.ɵfac
+	});
+};
+(() => {
+	(typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(BrowserXhr, [{ type: Service }], null, null);
+})();
+var XhrFactory = class XhrFactory {
+	static ɵfac = function XhrFactory_Factory(__ngFactoryType__) {
+		return new (__ngFactoryType__ || XhrFactory)();
+	};
+	static ɵprov = /*@__PURE__*/ ɵɵdefineInjectable({
+		token: XhrFactory,
+		factory: function XhrFactory_Factory(__ngFactoryType__) {
+			let __ngConditionalFactory__ = null;
+			if (__ngFactoryType__) __ngConditionalFactory__ = new (__ngFactoryType__ || XhrFactory)();
+			else __ngConditionalFactory__ = ɵɵinject(BrowserXhr);
+			return __ngConditionalFactory__;
+		},
+		providedIn: "root"
+	});
+};
+(() => {
+	(typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(XhrFactory, [{
+		type: Injectable,
+		args: [{
+			providedIn: "root",
+			useExisting: BrowserXhr
+		}]
+	}], null, null);
+})();
 // node_modules/@angular/common/fesm2022/_module-chunk.mjs
 /**
 * @license Angular v22.2.4
@@ -2179,4 +2239,4 @@ var HttpResourceImpl = class extends ResourceImpl {
 		this._statusCode.set(void 0);
 	}
 };
-export { JsonpClientBackend as A, withXhr as B, HttpRequest as C, HttpUrlEncodingCodec as D, HttpStatusCode as E, withInterceptors as F, withInterceptorsFromDi as I, withJsonpSupport as L, REQUESTS_CONTRIBUTE_TO_STABILITY as M, provideHttpClient as N, HttpXhrBackend as O, withFetch as P, withNoXsrfProtection as R, HttpParams as S, HttpResponseBase as T, withXsrfConfiguration as V, HttpFeatureKind as _, HTTP_FETCH_MAX_RESPONSE_SIZE as a, HttpHeaders as b, HttpBackend as c, HttpClientModule as d, HttpClientXsrfModule as f, HttpEventType as g, HttpErrorResponse as h, FetchBackend as i, JsonpInterceptor as j, HttpXsrfTokenExtractor as k, HttpClient as l, HttpContextToken as m, httpResource as n, HTTP_INTERCEPTORS as o, HttpContext as p, withHttpTransferCache as r, HTTP_ROOT_INTERCEPTOR_FNS as s, HTTP_TRANSFER_CACHE_ORIGIN_MAP as t, HttpClientJsonpModule as u, HttpHandler as v, HttpResponse as w, HttpInterceptorHandler as x, HttpHeaderResponse as y, withRequestsMadeViaParent as z };
+export { JsonpClientBackend as A, withXhr as B, HttpRequest as C, HttpUrlEncodingCodec as D, HttpStatusCode as E, withInterceptors as F, parseCookieValue as H, withInterceptorsFromDi as I, withJsonpSupport as L, REQUESTS_CONTRIBUTE_TO_STABILITY as M, provideHttpClient as N, HttpXhrBackend as O, withFetch as P, withNoXsrfProtection as R, HttpParams as S, HttpResponseBase as T, withXsrfConfiguration as V, HttpFeatureKind as _, HTTP_FETCH_MAX_RESPONSE_SIZE as a, HttpHeaders as b, HttpBackend as c, HttpClientModule as d, HttpClientXsrfModule as f, HttpEventType as g, HttpErrorResponse as h, FetchBackend as i, JsonpInterceptor as j, HttpXsrfTokenExtractor as k, HttpClient as l, HttpContextToken as m, httpResource as n, HTTP_INTERCEPTORS as o, HttpContext as p, withHttpTransferCache as r, HTTP_ROOT_INTERCEPTOR_FNS as s, HTTP_TRANSFER_CACHE_ORIGIN_MAP as t, HttpClientJsonpModule as u, HttpHandler as v, HttpResponse as w, HttpInterceptorHandler as x, HttpHeaderResponse as y, withRequestsMadeViaParent as z };

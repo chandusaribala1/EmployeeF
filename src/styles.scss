@@ -3,3 +3,34 @@
 html, body { min-height: 100%; margin: 0; }
 body { background: #f5f8f6; }
 button, input, select, textarea { font-family: inherit; }
+
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+
+/* Global font */
+body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+}
+
+/* Buttons */
+button {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+}
+
+/* Input fields */
+input, textarea, select {
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Labels and paragraphs */
+p, label, span {
+    font-family: 'Poppins', sans-serif;
+}
