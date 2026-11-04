@@ -166,7 +166,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .letters-page-size span { width: 100%; margin: 0; text-align: center; }
 }
 
-.calendar-day-lop { color: #9a3f3b !important; background: #f9e4e1 !important; }
 .letter-list { padding: 10px 16px 16px; }
 .letter-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 4px; border-bottom: 1px solid #edf1ee; }
 .letter-row:last-child { border-bottom: 0; }
@@ -277,24 +276,26 @@ button:hover,
 .calendar-nav { display: inline-grid; width: 30px; height: 30px; place-items: center; border: 1px solid #e2e9e5; border-radius: 4px; color: #536a5d; background: #fff; font-size: 19px; line-height: 1; }
 .attendance-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 18px; }
 .calendar-weekday { padding: 3px 0 6px; color: #95a19b; font-size: 9px; font-weight: 700; text-align: center; }
-.calendar-day, .calendar-day-empty { display: grid; min-width: 0; min-height: 36px; place-items: center; border: 1px solid transparent; border-radius: 4px; color: #64736b; background: #f6f8f6; font-size: 10px; }
-.calendar-day-present { color: #356a48 !important; background: #e8f3e9 !important; }
-.calendar-day-exception { color: #916c21 !important; background: #fff4d9 !important; }
-.calendar-day-half-leave { color: #54788a !important; background: #e8f1f5 !important; }
-.calendar-day-full-leave { color: #80689b !important; background: #f1eaf7 !important; }
-.calendar-day-holiday { color: #a45445 !important; background: #fbebe6 !important; }
-.calendar-day-week-off { color: #89948e !important; background: #f0f2f1 !important; }
+.calendar-day, .calendar-day-empty { display: grid; min-width: 0; min-height: 48px; place-items: center; border: 1px solid transparent; border-radius: 11px; color: #64736b; background: #f6f8f6; font-size: 11px; }
+.calendar-day-present { border-color: #23804b; color: #17653b !important; background: #b8e2c8 !important; font-weight: 700; }
+.calendar-day-exception { border-color: #b65b18; color: #9b4210 !important; background: #ffead8 !important; font-weight: 700; }
+.calendar-day-lop { border-color: #f05219; color: #c83c0c !important; background: #ffddca !important; font-weight: 700; }
+.calendar-day-half-leave { border-color: #3986dc; color: #2868b7 !important; background: #e5f0ff !important; }
+.calendar-day-full-leave { border-color: #8d5be8; color: #7041c2 !important; background: #f1eaff !important; }
+.calendar-day-holiday { border-color: #128b83; color: #087871 !important; background: #c9f2ef !important; }
+.calendar-day-week-off { border-color: #53647b; color: #43536a !important; background: #e2e8f0 !important; }
 .calendar-day-today { border-color: #4b8061; box-shadow: inset 0 0 0 1px #4b8061; font-weight: 800; }
-.calendar-day-no-record { color: #67766e; background: #fff; }
+.calendar-day-no-record { border-color: #e2e8e4; color: #67766e; background: #fff; }
 .attendance-calendar-legend { display: flex; flex-wrap: wrap; gap: 8px 13px; margin-top: 14px; }
 .attendance-calendar-legend span { display: inline-flex; align-items: center; gap: 5px; color: #7f8c85; font-size: 8px; white-space: nowrap; }
 .attendance-calendar-legend i { width: 8px; height: 8px; border-radius: 2px; background: #fff; }
 .attendance-calendar-legend .calendar-day-present { background: #b7d9bd !important; }
-.attendance-calendar-legend .calendar-day-exception { background: #f0d89c !important; }
+.attendance-calendar-legend .calendar-day-exception { background: #ffead8 !important; }
+.attendance-calendar-legend .calendar-day-lop { background: #ffddca !important; }
 .attendance-calendar-legend .calendar-day-half-leave { background: #c7dce5 !important; }
 .attendance-calendar-legend .calendar-day-full-leave { background: #d9c8e9 !important; }
-.attendance-calendar-legend .calendar-day-holiday { background: #efc1b4 !important; }
-.attendance-calendar-legend .calendar-day-week-off { background: #dce1de !important; }
+.attendance-calendar-legend .calendar-day-holiday { background: #c9f2ef !important; }
+.attendance-calendar-legend .calendar-day-week-off { background: #e2e8f0 !important; }
 .attendance-calendar-legend .calendar-day-no-record { border: 1px solid #dfe6e1; }
 .holiday-page-heading { align-items: center; }
 .holiday-count-chip { padding: 9px 13px; border: 1px solid #e2e9e5; border-radius: 20px; color: #557262; background: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; }

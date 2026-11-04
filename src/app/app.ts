@@ -65,11 +65,27 @@ export class App {
       .sort((left, right) => right.employeeId.localeCompare(left.employeeId, 'en', { numeric: true }));
   });
   protected readonly filteredAttendance = computed(() => [this.currentEmployee()].filter((employee) => `${employee.firstName} ${employee.lastName} ${employee.employeeId}`.toLowerCase().includes(this.attendanceSearch().toLowerCase())).map((employee) => {
-    const records = this.calendarAttendance().filter((record) => record.employeeId === employee.employeeId && record.workDate.startsWith(`${this.attendanceMonth().getFullYear()}-${String(this.attendanceMonth().getMonth() + 1).padStart(2, '0')}`));
+    const month = this.attendanceMonth();
+    const prefix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-`;
+    const records = this.calendarAttendance().filter((record) => record.employeeId === employee.employeeId && record.workDate.startsWith(prefix));
     const presentDays = records.filter((record) => record.status === 'Present' || record.status === 'Late').length;
     const leaveDays = records.filter((record) => record.status === 'On leave' || record.status === 'Half day leave').length;
-    const workingDays = this.countMonthWorkingDays(this.attendanceMonth());
-    return { employee, workingDays, presentDays, leaveDays, lopDays: records.filter(record => record.status === 'LOP').length };
+    const workingDays = this.countMonthWorkingDays(month);
+    const attendanceByDate = new Map(records.map((record) => [record.workDate, record]));
+    let lopDays = 0;
+    const today = this.localDateString(new Date());
+    for (let day = 1; day <= new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate(); day++) {
+      const date = `${prefix}${String(day).padStart(2, '0')}`;
+      const dateObject = new Date(month.getFullYear(), month.getMonth(), day);
+      const weekday = dateObject.getDay();
+      const holiday = this.publicHolidays().some((item) => item.date === date);
+      const approvedLeave = this.leaveRequests().some((request) => request.employeeId === employee.employeeId
+        && request.status === 'Approved' && request.startDate <= date && request.endDate >= date);
+      if (date >= today || weekday === 0 || weekday === 6 || holiday || approvedLeave) continue;
+      const record = attendanceByDate.get(date);
+      if (!record || record.status === 'LOP' || !this.hasPunch(record.checkIn) || !this.hasPunch(record.checkOut)) lopDays++;
+    }
+    return { employee, workingDays, presentDays, leaveDays, lopDays };
   }));
   protected readonly resignations = signal<ResignationRow[]>([]);
   protected readonly profileTab = signal('Basic Information');
@@ -136,14 +152,20 @@ export class App {
         && request.status === 'Approved' && request.startDate <= isoDate && request.endDate >= isoDate);
       let status: AttendanceCalendarStatus = 'no-record';
       let label = 'No record';
-      if (record?.status === 'Present') { status = 'present'; label = 'Present'; }
+      if (record?.status === 'LOP') { status = 'lop'; label = 'Full day LOP · missing check-in or check-out'; }
+      else if (record && (!this.hasPunch(record.checkIn) || !this.hasPunch(record.checkOut))
+        && isoDate < today && weekday !== 0 && weekday !== 6 && !holidayName && !approvedLeave) {
+        status = 'lop';
+        label = 'Full day LOP · missing check-in or check-out';
+      }
+      else if (record?.status === 'Present') { status = 'present'; label = 'Present'; }
       else if (record?.status === 'Late') { status = 'exception'; label = 'Exception'; }
-      else if (record?.status === 'LOP') { status = 'lop'; label = 'LOP · missed checkout'; }
       else if (record?.status === 'Half day leave') { status = 'half-day-leave'; label = 'Half day leave'; }
       else if (record?.status === 'On leave') { status = 'full-day-leave'; label = 'Full day leave'; }
       else if (holidayName) { status = 'holiday'; label = holidayName; }
       else if (approvedLeave && weekday !== 0 && weekday !== 6) { status = 'full-day-leave'; label = 'Full day leave'; }
       else if (weekday === 0 || weekday === 6) { status = 'week-off'; label = 'Week off'; }
+      else if (isoDate < today) { status = 'lop'; label = 'Full day LOP · no attendance recorded'; }
       cells.push({ day, isoDate, status, label, holidayName, today: isoDate === today });
     }
     return cells;
@@ -731,6 +753,10 @@ export class App {
   protected hasCheckedOut(): boolean {
     const checkOut = this.currentAttendance()?.checkOut;
     return !!checkOut && checkOut !== '—';
+  }
+
+  private hasPunch(value: string): boolean {
+    return !!value && value !== '—';
   }
 
   private enterDashboard(employee: Employee): void {
